@@ -46,24 +46,17 @@
               <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
             </li> -->
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                Attributes
-              </a>
-              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                <a class="dropdown-item" href="#">Action</a>
-                <a class="dropdown-item" href="#">Another action</a>
-                <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="#">Something else here</a>
-              </div>
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Attributes
+                </a>
+                <ul id="attributes-dropdown-list" class="dropdown-menu checkbox-menu dropdown-menu-right allow-focus" aria-labelledby="dropdownMenu2">
+                </ul>
             </li>
           </ul>
         </div>
       </nav>
 
       <div class="container-fluid">
-        <h1 class="mt-4"></h1>
-        <p>The starting state of the menu will appear collapsed on smaller screens, and will appear non-collapsed on larger screens. When toggled using the button below, the menu will change.</p>
-        <p>Make sure to keep all page content within the <code>#page-content-wrapper</code>. The top navbar is optional, and just for demonstration. Just create an element with the <code>#menu-toggle</code> ID which will toggle the menu when clicked.</p>
       </div>
     </div>
     <!-- /#page-content-wrapper -->
@@ -77,8 +70,14 @@
 
   <!-- Menu Toggle Script -->
   <script>
-    var all_data = {{ returned_data.all_data | safe }}
-    var all_counties = {{ returned_data.all_counties | safe }}
+    var all_data = {{ returned_data.all_data | safe }};
+    // var all_counties = {{ returned_data.all_counties | safe }};
+    // var county = {{ returned_data.county_name | safe }};
+
+    var all_counties = new Set();
+    all_data.forEach(element => {
+      all_counties.add(element["County"])
+    });
 
     $("#menu-toggle").click(function(e) {
       e.preventDefault();
@@ -87,7 +86,7 @@
 
     d3.select("#counties")
         .selectAll("a")
-        .data(all_counties)
+        .data(Array.from(all_counties))
         .enter()
         .append("a")
         .text(function (d) {
@@ -96,8 +95,80 @@
         .attr("value", function (d) {
             return d;
         })//value selected in dropdown
-        .attr("href", "#")
-        .attr("class", "list-group-item list-group-item-action bg-light"); 
+        // .attr("href", function (d) {
+        //   return "/county/" + d
+        // })
+        .attr("class", "county list-group-item list-group-item-action bg-light"); 
+    
+      // $(".county").on('click', function(event){
+      //   event.stopPropagation();
+      //   event.stopImmediatePropagation();
+      //   // foo(this.text)
+      //   console.log("hi")
+      // });
+    
+    var county = document.getElementsByClassName("county");
+    var i;
+    var data;
+    for (i = 0; i < county.length; i++) {
+        county[i].addEventListener("click", function() {
+            var cur_county = this.text;
+            $.ajax({
+                url: "/county/" + this.text,
+                success: function(response) {
+                    data = JSON.parse(response);
+                    bar(data, cur_county);
+                }
+            })
+        });
+    }
+
+    var numeric_attributes = ['Year', 'Month', 'Week', 'Infected', 'Avg household size',
+    'Area', 'Population', 'Under_18', '18-24', '25-44', '45-64', 'Above_65', 'Median_age',
+    'Medianfamilyincome', 'Number_households', 'Beds_adult_facility_care', 'Beds_hospital', 
+    'County_Served_hospital', 'Service_hospital', 'Discharges_Other_Hospital_intervention', 
+    'Discharges_Respiratory_system_interventions', 'Total_Charge_Other_Hospital_intervention', 
+    'Total_Charge_Respiratory_system_interventions', 'Unemp_rate'];
+    // Populate dropdown attributes
+    var divs_attributes = d3.select("#attributes-dropdown-list")
+                            .selectAll("li")
+                            .data(Array.from(numeric_attributes))
+                            .enter()
+                            .append("li")
+                            .append("label")
+                                .text(function (d) { return d; })
+                            .append("input")
+                                .attr("type", "checkbox");
+
+    $(document).on('click', '.allow-focus', function (e) {
+        e.stopPropagation();
+    });
+
+    var selected_attributes = new Set();
+    $(".checkbox-menu").on("change", "input[type='checkbox']", function() {
+        $(this).closest("li").toggleClass("active", this.checked);        
+        $.each($("#attributes-dropdown-list li label"), function(){
+            var selected_attribute = $(this).text();
+            if ($(this).children()[0].checked) {
+                selected_attributes.add(selected_attribute);
+            }
+            else {
+                selected_attributes.delete(selected_attribute);
+            }
+        });
+    });
+    console.log()    
+        
+    
+    // function foo(county_name) {
+    //   (all_data.filter(function (point) {
+    //     return point["County"] === county_name;
+    //   }))
+    // }
+
+    function bar(d, county) {
+        console.log(d[county]);
+    }
     
   </script>
 
