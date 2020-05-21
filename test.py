@@ -11,4 +11,6 @@ x = filtered_by_county_df[numeric_cols].values #returns a numpy array
 min_max_scaler = preprocessing.StandardScaler()
 x_scaled = min_max_scaler.fit_transform(x)
 df = pd.DataFrame(x_scaled, columns=numeric_cols)
-df.corr().fillna(0).to_csv("test.csv")
+correlation_matrix_df = df.corr().fillna(0)
+correlation_matrix_df["Attributes"] = correlation_matrix_df.keys()
+print(correlation_matrix_df["Year"]["Month"])

@@ -8,7 +8,7 @@
   <meta name="description" content="">
   <meta name="author" content="">
 
-  <title>Simple Sidebar - Start Bootstrap Template</title>
+  <!-- <title></title> -->
   <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/bootstrap.min.css') }}">
   <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/simple-sidebar.css') }}">
   <link href="{{ url_for('static',filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
@@ -17,6 +17,52 @@
 
 
 </head>
+<style>
+
+    svg {
+      font: 10px sans-serif;
+      padding: 10px;
+    }
+    
+    .axis,
+    .frame {
+      shape-rendering: crispEdges;
+    }
+    
+    .axis line {
+      stroke: #ddd;
+    }
+    
+    .axis path {
+      display: none;
+    }
+    
+    .cell text {
+      font-weight: bold;
+      text-transform: capitalize;
+      fill: black;
+    }
+    
+    .frame {
+      fill: none;
+      stroke: #aaa;
+    }
+    
+    circle {
+      fill-opacity: .7;
+    }
+    
+    circle.hidden {
+      fill: #ccc !important;
+    }
+    
+    .extent {
+      fill: #000;
+      fill-opacity: .125;
+      stroke: #fff;
+    }
+    
+    </style>
 
 <body>
 
@@ -57,6 +103,18 @@
       </nav>
 
       <div class="container-fluid">
+          <div class="row">
+            <div class="col-md-12" id = "suggestions">
+            </div> 
+          </div>
+          <div class="row">
+            <div class="col-md-12" id = "scatterplot">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12" id = "story">
+            </div> 
+          </div>
       </div>
     </div>
     <!-- /#page-content-wrapper -->
@@ -100,28 +158,25 @@
         // })
         .attr("class", "county list-group-item list-group-item-action bg-light"); 
     
-      // $(".county").on('click', function(event){
-      //   event.stopPropagation();
-      //   event.stopImmediatePropagation();
-      //   // foo(this.text)
-      //   console.log("hi")
-      // });
-    
     var county = document.getElementsByClassName("county");
     var i;
     var data;
-    for (i = 0; i < county.length; i++) {
-        county[i].addEventListener("click", function() {
-            var cur_county = this.text;
-            $.ajax({
-                url: "/county/" + this.text,
-                success: function(response) {
-                    data = JSON.parse(response);
-                    bar(data, cur_county);
-                }
-            })
-        });
-    }
+    var cur_county = "ALBANY";
+    // for (i = 0; i < county.length; i++) {
+    //     county[i].addEventListener("click", function() {
+    //         cur_county = this.text;
+            
+    //     });
+    // }
+
+    $(document).on('click', ".county", function(event){
+        cur_county = this.text;
+        // console.log(this.text);
+        // event.stopPropagation();
+        // event.stopImmediatePropagation();
+        // foo(this.text)
+      });
+    // console.log(cur_county)
 
     var numeric_attributes = ['Year', 'Month', 'Week', 'Infected', 'Avg household size',
     'Area', 'Population', 'Under_18', '18-24', '25-44', '45-64', 'Above_65', 'Median_age',
@@ -145,29 +200,279 @@
     });
 
     var selected_attributes = new Set();
+    
+    var urlToSend = "/request?county=" + cur_county;
     $(".checkbox-menu").on("change", "input[type='checkbox']", function() {
-        $(this).closest("li").toggleClass("active", this.checked);        
+        $(this).closest("li").toggleClass("active", this.checked);   
         $.each($("#attributes-dropdown-list li label"), function(){
             var selected_attribute = $(this).text();
             if ($(this).children()[0].checked) {
-                selected_attributes.add(selected_attribute);
+                selected_attributes.add(selected_attribute);                
             }
             else {
                 selected_attributes.delete(selected_attribute);
             }
         });
+        console.log(selected_attributes);
+        if(selected_attributes.size == 2) {
+            selected_attributes.forEach(element => urlToSend += "&attributes=" + element);
+            sendURL();
+        }
+        if(selected_attributes.size == 3) {
+            selected_attributes.forEach(element => urlToSend += "&attributes=" + element);
+            sendURL();
+    }
     });
-    console.log()    
-        
     
-    // function foo(county_name) {
-    //   (all_data.filter(function (point) {
-    //     return point["County"] === county_name;
-    //   }))
-    // }
 
-    function bar(d, county) {
-        console.log(d[county]);
+    function sendURL() {
+        $.ajax({
+            url: urlToSend,
+            success: function(response) {
+                data = JSON.parse(response);
+                if(selected_attributes.size == 2) {
+                    plotScatterPlot(data["scatterplot"]);
+                    giveSuggestions(data["correlation"]);
+                }
+                else if(selected_attributes.size == 3) {
+                    plotScatterPlotMatrix(data["scatterplot_matrix"], data["scatterplot_matrix_text1"], data["scatterplot_matrix_text2"], data["scatterplot_matrix_text3"]);
+                }
+            }
+        })
+    }
+
+    function plotScatterPlot(scatterplot_data) {
+        var margin = {top: 10, right: 70, bottom: 50, left: 60},
+        width = 460 - margin.left - margin.right,
+        height = 400 - margin.top - margin.bottom;
+        
+        d3.select("#scatterplot").selectAll("svg").remove();
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#scatterplot")
+    .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+        .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+
+    // Add X axis
+    var x = d3.scaleLinear()
+        .domain([d3.min(scatterplot_data, function (d) { return +d["Year"]; }),
+                d3.max(scatterplot_data, function (d) { return +d["Year"]; })])
+        .range([ 0, width ]);
+    svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x));
+
+    // Add Y axis
+    var y = d3.scaleLinear()
+        .domain([d3.min(scatterplot_data, function (d) { return +d["Population"]; }),
+                d3.max(scatterplot_data, function (d) { return +d["Population"]; })])
+        .range([ height, 0]);
+    svg.append("g")
+        .call(d3.axisLeft(y));
+
+    // Add dots
+    svg.append('g')
+        .selectAll("dot")
+        .data(scatterplot_data)
+        .enter()
+        .append("circle")
+        .attr("cx", function (d) { return x(d.Year); } )
+        .attr("cy", function (d) { return y(d.Population); } )
+        .attr("r", 1.5)
+        .style("fill", "#69b3a2")
+
+    }
+
+    function giveSuggestions(correlation_matrix) {
+
+        var attributes = new Set(["Year", "Population"]);
+        var year_min = 0, year_min_attr, year_max = 0, year_max_attr;
+        var population_min = 0, population_min_attr, population_max = 0, population_max_attr;
+
+        correlation_matrix.forEach(function(d) {
+            if(!attributes.has(d["Attribute"])) {
+                if(d["Year"] < year_min) {
+                    year_min = d["Year"];
+                    year_min_attr = d["Attribute"];
+                }
+                if(d["Population"] < population_min) {
+                    population_min = d["Population"];
+                    population_min_attr = d["Attribute"];
+                }
+                if(d["Year"] > year_max) {
+                    year_max = d["Year"];
+                    year_max_attr = d["Attribute"];
+                }
+                if(d["Population"] > population_max) {
+                    population_max = d["Population"];
+                    population_max_attr = d["Attribute"];
+                }
+            }
+        });
+        d3.select("#suggestions").selectAll("p").remove();
+        var suggestions_div = d3.select("#suggestions")
+        suggestions_div.append("p").html("Highest positive correlation to Year: " + year_max_attr + "</br>");
+        // suggestions_div.append("p").html("Highly correlated to Population: " + population_max_attr + "</br>");
+        // suggestions_div.append("p").html("Negatively correlated to Year: " + year_min_attr + "</br>");
+        suggestions_div.append("p").html("Highest negative correlation to Population: " + population_min_attr + "</br>");
+    }
+
+    function plotScatterPlotMatrix(task3_data, string1, string2, string3) {
+
+    ///// Code courtesy: https://bl.ocks.org/Fil/6d9de24b31cb870fed2e6178a120b17d ////
+    
+    var size = 250,
+        padding = 20;
+
+    var x = d3.scaleLinear()
+        .range([padding / 2, size - padding / 2]);
+    
+    var y = d3.scaleLinear()
+        .range([size - padding / 2, padding / 2]);
+    
+    var xAxis = d3.axisBottom()
+        .scale(x)
+        .ticks(6);
+    
+    var yAxis = d3.axisLeft()
+        .scale(y)
+        .ticks(6);
+    d3.select("#scatterplot").selectAll("svg").remove();
+
+    var domainByTrait = {},
+        traits = d3.keys(task3_data[0]),
+        n = traits.length;
+    
+
+    traits.forEach(function(trait) {
+        domainByTrait[trait] = d3.extent(task3_data, function(d) { return d[trait]; });
+    });
+    
+    xAxis.tickSize(size * n);
+    yAxis.tickSize(-size * n);
+
+    var brush = d3.brush()
+        .on("start", brushstart)
+        .on("brush", brushmove)
+        .on("end", brushend)
+        .extent([[0,0],[size,size]]);
+    
+    var svg = d3.select("#scatterplot")
+                .append("svg")
+                .attr("width", size * n + padding)
+                .attr("height", size * n + padding)
+                .append("g")
+                .attr("transform", "translate(" + 210 + "," + 100 + ")" + 
+                        " scale(" + 0.7 + "," + 0.7 + ")");
+
+    svg.selectAll(".x.axis")
+    .data(traits)
+    .enter().append("g")
+    .attr("class", "x axis")
+    .attr("transform", function(d, i) { return "translate(" + (n - i - 1) * size + ",0)" })
+    .each(function(d) { x.domain(domainByTrait[d]); d3.select(this).call(xAxis); });
+    
+    svg.selectAll(".y.axis")
+    .data(traits)
+    .enter().append("g")
+    .attr("class", "y axis")
+    .attr("transform", function(d, i) { return "translate(0," + i * size + ")"; })
+    .each(function(d) { y.domain(domainByTrait[d]); d3.select(this).call(yAxis); });
+
+    
+    svg.append("text")
+        .attr("x", (300 / 2))             
+        .attr("y", 0 - (230 / 2))
+        .attr("text-anchor", "middle")  
+        .style("font-size", "20px") 
+        .style("text-decoration", "underline")  
+        // .text(title_text);
+        
+    var cell = svg.selectAll(".cell")
+        .data(cross(traits, traits))
+        .enter().append("g")
+        .attr("class", "cell")
+        .attr("transform", function(d) { return "translate(" + (n - d.i - 1) * size + "," + d.j * size + ")"; })
+        .each(plot);
+
+    // Titles for the diagonal.
+    cell.filter(function(d) { return d.i === d.j; }).append("text")
+        .attr("x", padding)
+        .attr("y", padding)
+        .attr("dy", ".71em")
+        .text(function(d) { return d.x; });
+
+    cell.call(brush);
+
+    function plot(p) {
+        var cell = d3.select(this);
+
+        x.domain(domainByTrait[p.x]);
+        y.domain(domainByTrait[p.y]);
+
+        cell.append("rect")
+            .attr("class", "frame")
+            .attr("x", padding / 2)
+            .attr("y", padding / 2)
+            .attr("width", size - padding)
+            .attr("height", size - padding);
+
+        cell.selectAll("circle")
+            .data(task3_data)
+        .enter().append("circle")
+            .attr("cx", function(d) { return x(d[p.x]); })
+            .attr("cy", function(d) { return y(d[p.y]); })
+            .attr("r", 1.5)
+            .style("fill", "#69b3a2")
+    }
+
+    var brushCell;
+
+    // Clear the previously-active brush, if any.
+    function brushstart(p) {
+        if (brushCell !== this) {
+        d3.select(brushCell).call(brush.move, null);
+        brushCell = this;
+        x.domain(domainByTrait[p.x]);
+        y.domain(domainByTrait[p.y]);
+        }
+    }
+
+    // Highlight the selected circles.
+    function brushmove(p) {
+        var e = d3.brushSelection(this);
+        svg.selectAll("circle").classed("hidden", function(d) {
+        return !e
+            ? false
+            : (
+            e[0][0] > x(+d[p.x]) || x(+d[p.x]) > e[1][0]
+            || e[0][1] > y(+d[p.y]) || y(+d[p.y]) > e[1][1]
+            );
+        });
+    }
+
+    // If the brush is empty, select all circles.
+    function brushend() {
+        var e = d3.brushSelection(this);
+        if (e === null) svg.selectAll(".hidden").classed("hidden", false);
+    }
+    
+    function cross(a, b) {
+        var c = [], n = a.length, m = b.length, i, j;
+        for (i = -1; ++i < n;) for (j = -1; ++j < m;) c.push({x: a[i], i: i, y: b[j], j: j});
+        return c;
+    }
+
+
+    d3.select("#story").selectAll("p").remove();
+        var story_div = d3.select("#story")
+        story_div.append("p").html(string1 + "</br>");
+        story_div.append("p").html(string2 + "</br>");
+        story_div.append("p").html(string3 + "</br>");
     }
     
   </script>
