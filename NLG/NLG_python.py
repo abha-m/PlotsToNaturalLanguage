@@ -40,4 +40,4 @@ phrase_element.addCoordinate(s2)
 
 
 story = realiser.realiseSentence(phrase_element)
-# print(story)
+print(story)
